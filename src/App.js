@@ -3,6 +3,8 @@ import MainPage from './MainPage';
 import AddWordFlashcardsPage from './AddWordFlashcardsPage';
 import HelpPage from './HelpPage';
 import TestsPage from './TestsPage'; // Новый компонент для вкладки "Тесты"
+import FeedbackPage from './FeedbackPage';
+import BlogPage from './BlogPage';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('main');
@@ -32,6 +34,10 @@ const App = () => {
         return <HelpPage />;
       case 'tests':
         return <TestsPage words={learnedWords} />; // Передаем изученные слова в тесты
+     case 'blog':
+        return <BlogPage />;
+     case 'feedback':
+        return <FeedbackPage />;
       default:
         return <MainPage />;
     }
@@ -59,6 +65,12 @@ const App = () => {
        </button>
        <button onClick={() => setActiveTab('tests')}>
          <i className="fas fa-clipboard-check"></i> Тесты
+       </button>
+       <button onClick={() => setActiveTab('blog')}>
+         <i className="fas fa-blog"></i> Статьи
+       </button>
+       <button onClick={() => setActiveTab('feedback')}>
+         <i className="fas fa-comments"></i> Отзывы
        </button>
       </nav>
       <div className="tab-content">
