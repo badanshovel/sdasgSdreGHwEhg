@@ -1,24 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from './firebase';
+import ReCAPTCHA from 'react-google-recaptcha';
+import './App.css';
 
 const FeedbackPage = () => {
-  const [feedback, setFeedback] = useState({
-    name: '',
-    email: '',
-    message: ''
-  });
-
+  const [feedback, setFeedback] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [testimonials, setTestimonials] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const captchaRef = useRef(null);
 
-  const handleSubmit = (e) => {
+  // Загрузка отзывов
+  useEffect(() => {
+    const fetchFeedback = async () => {
+      setLoading(true);
+      try {
+        const q = query(collection(db, 'feedback'), orderBy('date', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTestimonials(data);
+      } catch (err) {
+        setError('Ошибка при загрузке отзывов');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFeedback();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Здесь можно добавить отправку на сервер
-    const savedFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
-    savedFeedback.push({...feedback, date: new Date().toISOString()});
-    localStorage.setItem('feedback', JSON.stringify(savedFeedback));
-    
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
-    setFeedback({ name: '', email: '', message: '' });
+    setError('');
+
+    if (!captchaVerified) {
+      setError('Пожалуйста, подтвердите, что вы не робот');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        ...feedback,
+        date: new Date().toISOString()
+      });
+      setSubmitted(true);
+      setFeedback({ name: '', email: '', message: '' });
+      captchaRef.current.reset();
+      setCaptchaVerified(false);
+
+      // Обновляем список отзывов
+      const q = query(collection(db, 'feedback'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTestimonials(data);
+    } catch (err) {
+      setError('Ошибка при отправке отзыва');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCaptchaChange = (token) => {
+    setCaptchaVerified(!!token);
   };
 
   return (
@@ -57,8 +105,24 @@ const FeedbackPage = () => {
             />
           </div>
 
-          <button type="submit" className="btn-primary">
-            Отправить <i className="fas fa-paper-plane"></i>
+          <ReCAPTCHA
+            sitekey="6Ld_Rs8qAAAAADiLJfoABz-IKDtLyRWN-yadTgmL"
+            onChange={handleCaptchaChange}
+            ref={captchaRef}
+          />
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button type="submit" className="btn-primary" disabled={loading}>
+            {loading ? (
+              <>
+                <i className="fas fa-spinner fa-spin"></i> Отправка...
+              </>
+            ) : (
+              <>
+                Отправить <i className="fas fa-paper-plane"></i>
+              </>
+            )}
           </button>
         </form>
 
@@ -71,20 +135,26 @@ const FeedbackPage = () => {
 
       <div className="testimonials">
         <h3>💡 Что говорят пользователи</h3>
-        <div className="testimonials-grid">
-          {JSON.parse(localStorage.getItem('feedback') || '[]').map((item, index) => (
-            <div className="testimonial-card" key={index}>
-              <div className="user-meta">
-                <div className="avatar">{item.name[0]}</div>
-                <div>
-                  <h4>{item.name}</h4>
-                  <small>{new Date(item.date).toLocaleDateString()}</small>
+        {loading ? (
+          <div className="loading-spinner">
+            <i className="fas fa-spinner fa-spin"></i> Загрузка отзывов...
+          </div>
+        ) : (
+          <div className="testimonials-grid">
+            {testimonials.map((item) => (
+              <div className="testimonial-card" key={item.id}>
+                <div className="user-meta">
+                  <div className="avatar">{item.name[0]}</div>
+                  <div>
+                    <h4>{item.name}</h4>
+                    <small>{new Date(item.date).toLocaleDateString()}</small>
+                  </div>
                 </div>
+                <p className="message">"{item.message}"</p>
               </div>
-              <p className="message">"{item.message}"</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
